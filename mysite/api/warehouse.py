@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from mysite.db.model import Warehouse
-from mysite.db.schema import Message, WarehouseCreate, WarehouseUpdate, WarehouseSchema
+from mysite.db.schema import Message, WarehouseCreate, WarehouseUpdate, WarehouseSchema, DeleteMessage
 from mysite.db.db import SessionLocal
 
 router = APIRouter(prefix="/warehouse", tags=["warehouse"])
@@ -31,10 +31,15 @@ def get_one(warehouse_id: int, db: Session = Depends(get_db)):
 @router.post("/", response_model=Message[WarehouseSchema], status_code=201)
 def create(data: WarehouseCreate, db: Session = Depends(get_db)):
     obj = Warehouse(**data.model_dump())
+
     db.add(obj)
     db.commit()
     db.refresh(obj)
-    return {"message": "Склад добавлен", "data": obj}
+
+    return {
+        "message": "Склад добавлен",
+        "data": obj
+    }
 
 @router.put("/{warehouse_id}", response_model=Message[WarehouseSchema])
 def update(warehouse_id: int, data: WarehouseUpdate, db: Session = Depends(get_db)):
@@ -45,8 +50,36 @@ def update(warehouse_id: int, data: WarehouseUpdate, db: Session = Depends(get_d
     db.refresh(obj)
     return {"message": "Склад изменён", "data": obj}
 
-@router.delete("/{warehouse_id}", response_model=Message)
-def delete(warehouse_id: int, db: Session = Depends(get_db)):
-    db.delete(get_or_404(db, Warehouse, warehouse_id))
+
+
+from fastapi import Depends, HTTPException
+from sqlalchemy.orm import Session
+
+# Импортируй DeleteMessage из своего файла схем
+# Например:
+# from mysite.schemas.warehouse import DeleteMessage
+
+
+@router.delete("/{warehouse_id}", response_model=DeleteMessage)
+def delete(
+    warehouse_id: int,
+    db: Session = Depends(get_db)
+):
+    warehouse = (
+        db.query(Warehouse)
+        .filter(Warehouse.id == warehouse_id)
+        .first()
+    )
+
+    if warehouse is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Склад не найден"
+        )
+
+    db.delete(warehouse)
     db.commit()
-    return {"message": "Склад удалён"}
+
+    return {
+        "message": "Склад успешно удалён"
+    }
